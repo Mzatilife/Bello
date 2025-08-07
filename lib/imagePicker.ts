@@ -8,7 +8,7 @@ export interface ImagePickerResult {
   width?: number;
   height?: number;
   fileSize?: number;
-  fileName?: string;
+  fileName?: string | null;
 }
 
 export class ImagePickerService {
@@ -81,7 +81,7 @@ export class ImagePickerService {
       }
 
       const result = await ImagePicker.launchCameraAsync({
-        mediaTypes: ['images'],
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: true,
         aspect: [4, 3],
         quality: 0.8,
@@ -95,11 +95,11 @@ export class ImagePickerService {
       const asset = result.assets[0];
       return {
         uri: asset.uri,
-        type: asset.type || 'image',
+        type: (asset.type === 'image' || asset.type === 'video') ? asset.type : 'image',
         width: asset.width,
         height: asset.height,
         fileSize: asset.fileSize,
-        fileName: asset.fileName,
+        fileName: asset.fileName || null,
       };
     } catch (error) {
       console.error('Error picking from camera:', error);
@@ -127,7 +127,7 @@ export class ImagePickerService {
       }
 
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ['images'],
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: true,
         aspect: [4, 3],
         quality: 0.8,
@@ -141,11 +141,11 @@ export class ImagePickerService {
       const asset = result.assets[0];
       return {
         uri: asset.uri,
-        type: asset.type || 'image',
+        type: (asset.type === 'image' || asset.type === 'video') ? asset.type : 'image',
         width: asset.width,
         height: asset.height,
         fileSize: asset.fileSize,
-        fileName: asset.fileName,
+        fileName: asset.fileName || null,
       };
     } catch (error) {
       console.error('Error picking from gallery:', error);
@@ -173,7 +173,7 @@ export class ImagePickerService {
       }
 
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ['images'],
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsMultipleSelection: true,
         selectionLimit: maxCount,
         allowsEditing: false,
@@ -187,11 +187,11 @@ export class ImagePickerService {
 
       return result.assets.map(asset => ({
         uri: asset.uri,
-        type: asset.type || 'image',
+        type: (asset.type === 'image' || asset.type === 'video') ? asset.type : 'image',
         width: asset.width,
         height: asset.height,
         fileSize: asset.fileSize,
-        fileName: asset.fileName,
+        fileName: asset.fileName || null,
       }));
     } catch (error) {
       console.error('Error picking multiple images:', error);
@@ -224,14 +224,12 @@ export class ImagePickerService {
     return { valid: true };
   }
 
-  // Get image info
+  // Get image info (using expo-image-manipulator instead)
   static async getImageInfo(uri: string): Promise<{ width: number; height: number } | null> {
     try {
-      const result = await ImagePicker.getImageAsync(uri);
-      return {
-        width: result.width,
-        height: result.height,
-      };
+      // Note: getImageAsync doesn't exist in expo-image-picker
+      // This would require expo-image-manipulator or react-native Image.getSize
+      return null;
     } catch (error) {
       console.error('Error getting image info:', error);
       return null;

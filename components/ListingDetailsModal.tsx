@@ -220,9 +220,9 @@ export default function ListingDetailsModal({ visible, listing, onClose }: Listi
           {hasImages ? (
             <View style={styles.imageContainer}>
               <Image
-                source={{ uri: currentImage }}
+                source={{ uri: currentImage || '' }}
                 style={styles.mainImage}
-                resizeMode="cover"
+                resizeMode="contain"
               />
               {listing.images!.length > 1 && (
                 <>
@@ -306,46 +306,6 @@ export default function ListingDetailsModal({ visible, listing, onClose }: Listi
               </View>
             )}
 
-            {/* Seller Info */}
-            <View style={styles.sellerSection}>
-              <Text style={styles.sectionTitle}>Seller</Text>
-              <View style={styles.sellerInfo}>
-                <View style={styles.sellerAvatar}>
-                  {listingDetails?.profiles?.photo_url ? (
-                    <Image 
-                      source={{ uri: listingDetails.profiles.photo_url }} 
-                      style={styles.sellerAvatarImage}
-                    />
-                  ) : (
-                    <User size={24} color={theme.textSecondary} />
-                  )}
-                </View>
-                <View style={styles.sellerDetails}>
-                  <Text style={styles.sellerName}>
-                    {listingDetails?.profiles?.display_name || 'Anonymous Seller'}
-                  </Text>
-                  <View style={styles.sellerRating}>
-                    <Star size={14} color="#F59E0B" fill="#F59E0B" />
-                    <Text style={styles.ratingText}>
-                      {favoritesCount > 0 
-                        ? `${Math.min(5.0, 3.5 + (favoritesCount * 0.1)).toFixed(1)} (${favoritesCount} ${favoritesCount === 1 ? 'favorite' : 'favorites'})`
-                        : 'New seller'
-                      }
-                    </Text>
-                  </View>
-                  {listingDetails?.seller_listings_count && (
-                    <Text style={styles.sellerStats}>
-                      {listingDetails.seller_listings_count} active listings
-                    </Text>
-                  )}
-                  {listingDetails?.profiles?.created_at && (
-                    <Text style={styles.sellerJoined}>
-                      Joined {new Date(listingDetails.profiles.created_at).toLocaleDateString()}
-                    </Text>
-                  )}
-                </View>
-              </View>
-            </View>
           </View>
         </ScrollView>
 
@@ -365,10 +325,6 @@ export default function ListingDetailsModal({ visible, listing, onClose }: Listi
               <Text style={styles.buttonText}>
                 {addingToCart ? 'Adding...' : 'Add to Cart'}
               </Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.messageButton}>
-              <MessageCircle size={20} color={theme.surface} />
-              <Text style={styles.buttonText}>Message</Text>
             </TouchableOpacity>
           </View>
         )}

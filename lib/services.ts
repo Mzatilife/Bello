@@ -161,23 +161,45 @@ export const listingsService = {
     return { data, error };
   },
 
-  // Get user's listings
+  // Get user's listings with real views and favorites counts
   getUserListings: async (userId?: string) => {
     const targetUserId = userId || (await supabase.auth.getUser()).data.user?.id;
     if (!targetUserId) throw new Error('No user ID provided');
 
-    const { data, error } = await supabase
+    const { data: listings, error } = await supabase
       .from('listings')
       .select('*')
       .eq('user_id', targetUserId)
       .neq('status', 'deleted')
       .order('created_at', { ascending: false });
 
-    return { data, error };
+    if (error || !listings) return { data: listings, error };
+
+    // Get real favorites count for each listing
+    const listingsWithCounts = await Promise.all(
+      listings.map(async (listing) => {
+        const { data: favCount } = await supabase
+          .from('favorites')
+          .select('id', { count: 'exact' })
+          .eq('listing_id', listing.id);
+        
+        return {
+          ...listing,
+          likes: favCount?.length || 0
+        };
+      })
+    );
+
+    return { data: listingsWithCounts, error: null };
   },
 
   // Update a listing
   updateListing: async (listingId: string, updates: Partial<CreateListingData>) => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('No authenticated user');
+
+    console.log('Attempting to update listing:', listingId, 'by user:', user.id);
+
     const { data, error } = await supabase
       .from('listings')
       .update({
@@ -185,14 +207,26 @@ export const listingsService = {
         updated_at: new Date().toISOString(),
       })
       .eq('id', listingId)
+      .eq('user_id', user.id) // Ensure user owns the listing
       .select()
       .single();
+
+    if (error) {
+      console.error('Update listing error:', error);
+    } else {
+      console.log('Listing updated successfully:', data);
+    }
 
     return { data, error };
   },
 
   // Delete a listing (soft delete)
   deleteListing: async (listingId: string) => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('No authenticated user');
+
+    console.log('Attempting to delete listing:', listingId, 'by user:', user.id);
+
     const { data, error } = await supabase
       .from('listings')
       .update({
@@ -200,8 +234,15 @@ export const listingsService = {
         updated_at: new Date().toISOString(),
       })
       .eq('id', listingId)
+      .eq('user_id', user.id) // Ensure user owns the listing
       .select()
       .single();
+
+    if (error) {
+      console.error('Delete listing error:', error);
+    } else {
+      console.log('Listing deleted successfully:', data);
+    }
 
     return { data, error };
   },
@@ -293,6 +334,25 @@ export const favoritesService = {
       .eq('listing_id', listingId);
 
     return { data: data?.length || 0, error };
+  },
+
+  // Get user's favorites with listing details
+  getFavoritesWithListings: async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('No authenticated user');
+
+    const { data, error } = await supabase
+      .from('favorites')
+      .select(`
+        *,
+        listings!listing_id (
+          *
+        )
+      `)
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false });
+
+    return { data, error };
   },
 };
 

@@ -122,7 +122,7 @@ export default function SellScreen() {
         price: Number(price),
         category: category || 'Other',
         condition: condition || 'Good',
-        location: location.trim() || null,
+        location: location.trim() || undefined,
         images: images.length > 0 ? images : undefined,
         status: 'active'
       };
