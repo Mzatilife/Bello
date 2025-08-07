@@ -1,8 +1,9 @@
 import React from 'react';
-import { View, TouchableOpacity, Text, StyleSheet, Alert } from 'react-native';
+import { View, TouchableOpacity, Text, StyleSheet } from 'react-native';
 import Icon from 'react-native-vector-icons/FontAwesome';
 import { useAuth } from '../context/AuthContext';
 import { useAppContext } from '@/hooks/useAppContext';
+import { notificationService } from '@/lib/notificationService';
 
 const SocialLoginButtons = () => {
   const { signInWithOAuth, loading } = useAuth();
@@ -14,11 +15,19 @@ const SocialLoginButtons = () => {
       
       if (error) {
         console.log('Google sign-in error', error);
-        Alert.alert('Error', `Google sign-in failed: ${error.message || 'Unknown error'}`);
+        notificationService.showNotification({
+          type: 'error',
+          title: 'Error',
+          message: `Google sign-in failed: ${error.message || 'Unknown error'}`,
+        });
       }
     } catch (err) {
       console.error('Google OAuth error:', err);
-      Alert.alert('Error', 'Google sign-in is not available in this environment');
+      notificationService.showNotification({
+        type: 'error',
+        title: 'Error',
+        message: 'Google sign-in is not available in this environment',
+      });
     }
   };
 
@@ -28,11 +37,19 @@ const SocialLoginButtons = () => {
       
       if (error) {
         console.log('Apple sign-in error', error);
-        Alert.alert('Error', `Apple sign-in failed: ${error.message || 'Unknown error'}`);
+        notificationService.showNotification({
+          type: 'error',
+          title: 'Error',
+          message: `Apple sign-in failed: ${error.message || 'Unknown error'}`,
+        });
       }
     } catch (err) {
       console.error('Apple OAuth error:', err);
-      Alert.alert('Error', 'Apple sign-in is not available in this environment');
+      notificationService.showNotification({
+        type: 'error',
+        title: 'Error',
+        message: 'Apple sign-in is not available in this environment',
+      });
     }
   };
 
@@ -42,11 +59,19 @@ const SocialLoginButtons = () => {
       
       if (error) {
         console.log('Facebook sign-in error', error);
-        Alert.alert('Error', `Facebook sign-in failed: ${error.message || 'Unknown error'}`);
+        notificationService.showNotification({
+          type: 'error',
+          title: 'Error',
+          message: `Facebook sign-in failed: ${error.message || 'Unknown error'}`,
+        });
       }
     } catch (err) {
       console.error('Facebook OAuth error:', err);
-      Alert.alert('Error', 'Facebook sign-in is not available in this environment');
+      notificationService.showNotification({
+        type: 'error',
+        title: 'Error',
+        message: 'Facebook sign-in is not available in this environment',
+      });
     }
   };
 

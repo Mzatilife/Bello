@@ -1,5 +1,5 @@
 import { Tabs } from 'expo-router';
-import { Home, Plus, User, Search, MessageCircle, Lock } from 'lucide-react-native';
+import { Home, Plus, User, Search, ShoppingBag, Lock } from 'lucide-react-native';
 import { useAppContext } from '@/hooks/useAppContext';
 import { useAuth } from '@/context/AuthContext';
 import { View } from 'react-native';
@@ -94,10 +94,10 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="messages"
+        name="checkout"
         options={{
-          title: 'Messages',
-          tabBarIcon: ({ size, color }) => renderProtectedIcon(MessageCircle, 26, color, true),
+          title: 'Cart',
+          tabBarIcon: ({ size, color }) => renderProtectedIcon(ShoppingBag, 26, color, true),
         }}
       />
       <Tabs.Screen

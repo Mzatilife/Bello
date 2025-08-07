@@ -6,6 +6,8 @@ import { useFrameworkReady } from '@/hooks/useFrameworkReady';
 import { ThemeProvider } from '@/context/ThemeContext';
 import { LanguageProvider } from '@/context/LanguageContext';
 import { AuthProvider } from '@/context/AuthContext';
+import NotificationProvider from '@/components/NotificationProvider';
+import { ListingsRefreshProvider } from '@/context/ListingsRefreshContext';
 
 export default function RootLayout() {
   useFrameworkReady();
@@ -36,12 +38,16 @@ export default function RootLayout() {
     <AuthProvider>
       <ThemeProvider>
         <LanguageProvider>
-          <Stack screenOptions={{ headerShown: false }}>
-            <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-            <Stack.Screen name="auth/callback" options={{ headerShown: false }} />
-            <Stack.Screen name="+not-found" />
-          </Stack>
-          <StatusBar style="auto" />
+          <ListingsRefreshProvider>
+            <NotificationProvider>
+              <Stack screenOptions={{ headerShown: false }}>
+                <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+                <Stack.Screen name="auth/callback" options={{ headerShown: false }} />
+                <Stack.Screen name="+not-found" />
+              </Stack>
+              <StatusBar style="auto" />
+            </NotificationProvider>
+          </ListingsRefreshProvider>
         </LanguageProvider>
       </ThemeProvider>
     </AuthProvider>

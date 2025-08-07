@@ -7,7 +7,6 @@ import {
   TouchableOpacity, 
   Modal, 
   ScrollView, 
-  Alert,
   Image 
 } from 'react-native';
 import { X, User, Mail, Phone, MapPin, Save, Camera } from 'lucide-react-native';
@@ -16,6 +15,7 @@ import { useAuth } from '@/context/AuthContext';
 import { profileService } from '@/lib/services';
 import { Profile } from '@/context/AuthContext';
 import ImagePickerService from '@/lib/imagePicker';
+import { notificationService } from '@/lib/notificationService';
 
 interface ProfileEditModalProps {
   visible: boolean;
@@ -53,7 +53,11 @@ export default function ProfileEditModal({ visible, onClose, onUpdate }: Profile
 
   const handleSave = async () => {
     if (!formData.display_name.trim()) {
-      Alert.alert(t.errorTitle, 'Display name is required');
+      notificationService.showNotification({
+        type: 'error',
+        title: t.errorTitle,
+        message: 'Display name is required',
+      });
       return;
     }
 
@@ -74,18 +78,30 @@ export default function ProfileEditModal({ visible, onClose, onUpdate }: Profile
 
       if (error) {
         console.error('Profile update error:', error);
-        Alert.alert(t.errorTitle, 'Failed to update profile');
+        notificationService.showNotification({
+          type: 'error',
+          title: t.errorTitle,
+          message: 'Failed to update profile',
+        });
         return;
       }
 
       if (data) {
         onUpdate(data);
-        Alert.alert(t.successTitle, 'Profile updated successfully!');
+        notificationService.showNotification({
+          type: 'success',
+          title: t.successTitle,
+          message: 'Profile updated successfully!',
+        });
         onClose();
       }
     } catch (error) {
       console.error('Profile update error:', error);
-      Alert.alert(t.errorTitle, 'Failed to update profile');
+      notificationService.showNotification({
+        type: 'error',
+        title: t.errorTitle,
+        message: 'Failed to update profile',
+      });
     } finally {
       setLoading(false);
     }

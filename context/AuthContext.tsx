@@ -76,6 +76,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const fetchProfile = async (userId: string) => {
     try {
+      // Wait a bit for the trigger to complete if this is a new user
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
       const { data, error } = await supabase
         .from('profiles')
         .select('*')
@@ -83,13 +86,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         .single();
 
       if (error) {
-        // If profile doesn't exist, create one
+        // If profile doesn't exist, wait a bit more and try again (for OAuth users)
         if (error.code === 'PGRST116') {
-          console.log('Profile not found, creating new profile for user:', userId);
-          await createProfile(userId);
+          console.log('Profile not found, waiting and retrying for user:', userId);
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          
+          // Try fetching again
+          const { data: retryData, error: retryError } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('uid', userId)
+            .single();
+            
+          if (retryError) {
+            if (retryError.code === 'PGRST116') {
+              console.log('Profile still not found, creating manually for user:', userId);
+              await createProfile(userId);
+            } else {
+              console.error('Error fetching profile on retry:', retryError);
+              setLoading(false);
+            }
+          } else {
+            setProfile(retryData);
+            setLoading(false);
+          }
         } else {
           console.error('Error fetching profile:', error);
-          // Set loading to false even if there's an error
           setLoading(false);
         }
       } else {
@@ -97,47 +119,78 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setLoading(false);
       }
     } catch (error) {
-      console.error('Error fetching profile:', error);
+      console.error('Error in fetchProfile:', error);
       setLoading(false);
     }
   };
 
   const createProfile = async (userId: string) => {
     try {
-      const user = await supabase.auth.getUser();
-      if (!user.data.user) {
+      const { data: userData } = await supabase.auth.getUser();
+      if (!userData.user) {
+        console.error('No user data available for profile creation');
         setLoading(false);
         return;
       }
 
+      const user = userData.user;
+      console.log('Creating profile for user:', userId, 'with metadata:', user.user_metadata);
+      
+      // Determine provider from app_metadata or user_metadata
+      let provider = 'email';
+      if (user.app_metadata?.provider) {
+        provider = user.app_metadata.provider;
+      } else if (user.app_metadata?.providers?.length > 0) {
+        provider = user.app_metadata.providers[0];
+      }
+
       const newProfile: Omit<Profile, 'created_at' | 'updated_at'> = {
         uid: userId,
-        email: user.data.user.email || null,
-        display_name: user.data.user.user_metadata?.full_name || user.data.user.email?.split('@')[0] || null,
-        photo_url: user.data.user.user_metadata?.avatar_url || null,
-        provider: 'email',
+        email: user.email || null,
+        display_name: user.user_metadata?.full_name || 
+                     user.user_metadata?.display_name || 
+                     user.user_metadata?.name ||
+                     (user.email ? user.email.split('@')[0] : null),
+        photo_url: user.user_metadata?.avatar_url || 
+                  user.user_metadata?.picture ||
+                  null,
+        provider: provider,
         last_login: new Date().toISOString(),
-        phone_number: user.data.user.phone || null,
-        is_email_verified: user.data.user.email_confirmed_at ? true : false,
+        phone_number: user.phone || user.user_metadata?.phone || null,
+        is_email_verified: user.email_confirmed_at ? true : false,
         role: 'user',
-        metadata: user.data.user.user_metadata || {},
+        metadata: user.user_metadata || {},
       };
 
+      console.log('Attempting to create profile with data:', newProfile);
+
+      // Try to upsert instead of insert to handle conflicts
       const { data, error } = await supabase
         .from('profiles')
-        .insert([newProfile])
+        .upsert([newProfile], {
+          onConflict: 'uid',
+          ignoreDuplicates: false
+        })
         .select()
         .single();
 
       if (error) {
-        console.error('Error creating profile:', error);
+        console.error('Error creating/updating profile:', error);
+        console.error('Error details:', {
+          code: error.code,
+          message: error.message,
+          details: error.details,
+          hint: error.hint
+        });
+        // Still set loading to false to prevent infinite loading
+        setLoading(false);
       } else {
-        console.log('Profile created successfully:', data);
+        console.log('Profile created/updated successfully:', data);
         setProfile(data);
+        setLoading(false);
       }
     } catch (error) {
-      console.error('Error creating profile:', error);
-    } finally {
+      console.error('Exception in createProfile:', error);
       setLoading(false);
     }
   };

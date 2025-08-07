@@ -1,12 +1,34 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Image, Alert } from 'react-native';
-import { User, Settings, Star, Package, Heart, LogOut, Edit, Moon, Sun } from 'lucide-react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Image } from 'react-native';
+import { User, Settings, Star, Package, Heart, LogOut, Edit, Moon, Sun, Activity, ShoppingBag, Clock } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { useAppContext } from '@/hooks/useAppContext';
 import { useAuth } from '@/context/AuthContext';
 import { BelloIcon } from '@/components/BelloIcon';
 import ProfileEditModal from '@/components/ProfileEditModal';
 import { Profile } from '@/context/AuthContext';
+import { listingsService, favoritesService, Listing } from '@/lib/services';
+import { notificationService } from '@/lib/notificationService';
+import { supabase } from '@/lib/supabase';
+import EnhancedImage from '@/components/EnhancedImage';
+
+interface UserStats {
+  totalListings: number;
+  activeListings: number;
+  soldListings: number;
+  favoriteListings: number;
+  totalOrders: number;
+}
+
+interface ActivityItem {
+  id: string;
+  type: 'joined' | 'listed' | 'sold' | 'favorited' | 'ordered' | 'login';
+  title: string;
+  description?: string;
+  timestamp: string;
+  icon: any;
+  color: string;
+}
 
 export default function ProfileScreen() {
   const router = useRouter();
@@ -14,17 +36,224 @@ export default function ProfileScreen() {
   const { session, user, profile, signOut, loading } = useAuth();
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [currentProfile, setCurrentProfile] = useState<Profile | null>(profile);
+  const [userStats, setUserStats] = useState<UserStats>({
+    totalListings: 0,
+    activeListings: 0,
+    soldListings: 0,
+    favoriteListings: 0,
+    totalOrders: 0,
+  });
+  const [recentActivity, setRecentActivity] = useState<ActivityItem[]>([]);
+  const [statsLoading, setStatsLoading] = useState(true);
   const styles = createStyles(theme);
 
-  React.useEffect(() => {
+  useEffect(() => {
     setCurrentProfile(profile);
   }, [profile]);
 
-  const handleLogout = async () => {
-    const { error } = await signOut();
-    if (error) {
-      Alert.alert('Error', 'Failed to log out');
+  useEffect(() => {
+    if (user) {
+      loadUserStats();
+      loadRecentActivity();
     }
+  }, [user]);
+
+  const loadUserStats = async () => {
+    if (!user) return;
+    
+    try {
+      setStatsLoading(true);
+      
+      // Get user's listings
+      const { data: listings, error: listingsError } = await supabase
+        .from('listings')
+        .select('id, status')
+        .eq('user_id', user.id);
+      
+      // Get user's favorites
+      const { data: favorites, error: favoritesError } = await supabase
+        .from('favorites')
+        .select('id')
+        .eq('user_id', user.id);
+      
+      // Get user's orders
+      const { data: orders, error: ordersError } = await supabase
+        .from('orders')
+        .select('id')
+        .eq('user_id', user.id);
+      
+      if (!listingsError && listings) {
+        const stats = listings.reduce((acc, listing) => {
+          acc.totalListings++;
+          if (listing.status === 'active') acc.activeListings++;
+          if (listing.status === 'sold') acc.soldListings++;
+          return acc;
+        }, { totalListings: 0, activeListings: 0, soldListings: 0 });
+        
+        setUserStats({
+          ...stats,
+          favoriteListings: favorites?.length || 0,
+          totalOrders: orders?.length || 0,
+        });
+      }
+    } catch (error) {
+      console.error('Error loading user stats:', error);
+    } finally {
+      setStatsLoading(false);
+    }
+  };
+  
+  const loadRecentActivity = async () => {
+    if (!user) return;
+    
+    try {
+      const activities: ActivityItem[] = [];
+      
+      // Add join date
+      if (currentProfile?.created_at) {
+        activities.push({
+          id: 'joined',
+          type: 'joined',
+          title: 'Joined Bello',
+          timestamp: currentProfile.created_at,
+          icon: User,
+          color: theme.primary,
+        });
+      }
+      
+      // Add recent listings
+      const { data: recentListings } = await supabase
+        .from('listings')
+        .select('id, title, created_at')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(3);
+      
+      recentListings?.forEach(listing => {
+        activities.push({
+          id: `listing-${listing.id}`,
+          type: 'listed',
+          title: 'Listed an item',
+          description: listing.title,
+          timestamp: listing.created_at,
+          icon: Package,
+          color: theme.success,
+        });
+      });
+      
+      // Add recent orders
+      const { data: recentOrders } = await supabase
+        .from('orders')
+        .select('id, created_at, status')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(2);
+      
+      recentOrders?.forEach(order => {
+        activities.push({
+          id: `order-${order.id}`,
+          type: 'ordered',
+          title: 'Placed an order',
+          description: `Order #${order.id.slice(0, 8)}`,
+          timestamp: order.created_at,
+          icon: ShoppingBag,
+          color: theme.primary,
+        });
+      });
+      
+      // Add last login
+      if (currentProfile?.last_login) {
+        activities.push({
+          id: 'last-login',
+          type: 'login',
+          title: 'Last active',
+          timestamp: currentProfile.last_login,
+          icon: Clock,
+          color: '#16A34A',
+        });
+      }
+      
+      // Sort by timestamp (most recent first)
+      activities.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+      
+      setRecentActivity(activities.slice(0, 5)); // Show only 5 most recent
+    } catch (error) {
+      console.error('Error loading recent activity:', error);
+    }
+  };
+  
+  const handleLogout = async () => {
+    notificationService.confirm(
+      'Sign Out',
+      'Are you sure you want to sign out?',
+      async () => {
+        const { error } = await signOut();
+        if (error) {
+          notificationService.error('Error', 'Failed to sign out');
+        }
+      },
+      undefined,
+      'Sign Out',
+      'Cancel'
+    );
+  };
+  
+  const handleMyListings = () => {
+    if (userStats.totalListings === 0) {
+      notificationService.info(
+        'No Listings Yet',
+        'You haven\'t created any listings yet. Start selling by adding your first item!',
+        [
+          { text: 'Close', style: 'cancel' },
+          { text: 'Start Selling', style: 'primary', onPress: () => router.push('/(tabs)/sell') },
+        ]
+      );
+      return;
+    }
+    
+    // For now, show a modal with user's listings info
+    notificationService.info(
+      'My Listings',
+      `You have ${userStats.totalListings} total listings:\n• ${userStats.activeListings} active\n• ${userStats.soldListings} sold`,
+      [
+        { text: 'Close', style: 'cancel' },
+        { text: 'Add New Listing', style: 'primary', onPress: () => router.push('/(tabs)/sell') },
+      ]
+    );
+  };
+  
+  const handleFavorites = () => {
+    if (userStats.favoriteListings === 0) {
+      notificationService.info(
+        'No Favorites Yet',
+        'You haven\'t added any items to your favorites yet. Browse the marketplace and save items you like!',
+        [
+          { text: 'Close', style: 'cancel' },
+          { text: 'Browse Items', style: 'primary', onPress: () => router.push('/(tabs)') },
+        ]
+      );
+      return;
+    }
+    
+    notificationService.info(
+      'My Favorites',
+      `You have ${userStats.favoriteListings} items in your favorites. Visit the home screen and look for the heart icons on items you've favorited.`,
+      [
+        { text: 'Close', style: 'cancel' },
+        { text: 'View Items', style: 'primary', onPress: () => router.push('/(tabs)') },
+      ]
+    );
+  };
+  
+  const handleSettings = () => {
+    notificationService.info(
+      'Settings',
+      'App settings and preferences:\n\n• Theme: Switch between light and dark mode\n• Language: Toggle between English and Chichewa\n• Notifications: Manage your notification preferences\n• Account: Edit your profile information',
+      [
+        { text: 'Close', style: 'cancel' },
+        { text: 'Edit Profile', style: 'primary', onPress: () => setEditModalVisible(true) },
+      ]
+    );
   };
 
   const handleProfileUpdate = (updatedProfile: Profile) => {
@@ -66,12 +295,20 @@ export default function ProfileScreen() {
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false} contentContainerStyle={{paddingBottom: 140}}>
       <View style={styles.header}>
         <View style={styles.profileInfo}>
-          <Image
-            source={{ 
-              uri: currentProfile?.photo_url || user?.user_metadata?.avatar_url || 'https://images.unsplash.com/photo-1530268729831-4b0b9e170218?w=200' 
-            }}
-            style={styles.profileImage}
-          />
+          <View style={styles.profileImageContainer}>
+            {currentProfile?.photo_url || user?.user_metadata?.avatar_url ? (
+              <EnhancedImage
+                uri={currentProfile?.photo_url || user?.user_metadata?.avatar_url}
+                fallbackUri={null}
+                style={styles.profileImage}
+                showLoadingIndicator={false}
+              />
+            ) : (
+              <View style={styles.defaultProfileImage}>
+                <User size={32} color={theme.textSecondary} />
+              </View>
+            )}
+          </View>
           <View style={styles.profileDetails}>
             <View style={styles.nameSection}>
               <Text style={styles.profileName}>
@@ -126,39 +363,45 @@ export default function ProfileScreen() {
 
       <View style={styles.statsContainer}>
         <View style={styles.statItem}>
-          <Text style={styles.statNumber}>{currentProfile?.metadata?.listings || '0'}</Text>
-          <Text style={styles.statLabel}>{t.listings}</Text>
+          <Text style={styles.statNumber}>{statsLoading ? '-' : userStats.totalListings}</Text>
+          <Text style={styles.statLabel}>Listings</Text>
         </View>
         <View style={styles.statItem}>
-          <Text style={styles.statNumber}>{currentProfile?.metadata?.sold || '0'}</Text>
-          <Text style={styles.statLabel}>{t.sold}</Text>
+          <Text style={styles.statNumber}>{statsLoading ? '-' : userStats.soldListings}</Text>
+          <Text style={styles.statLabel}>Sold</Text>
         </View>
         <View style={styles.statItem}>
-          <Text style={styles.statNumber}>{currentProfile?.metadata?.purchased || '0'}</Text>
-          <Text style={styles.statLabel}>{t.purchased}</Text>
+          <Text style={styles.statNumber}>{statsLoading ? '-' : userStats.favoriteListings}</Text>
+          <Text style={styles.statLabel}>Favorites</Text>
         </View>
       </View>
 
       <View style={styles.menuContainer}>
-        <TouchableOpacity style={styles.menuItem}>
+        <TouchableOpacity style={styles.menuItem} onPress={handleMyListings}>
           <View style={styles.menuIcon}>
-            <Package size={20} color="#64748B" />
+            <Package size={20} color={theme.textSecondary} />
           </View>
-          <Text style={styles.menuText}>{t.myListings}</Text>
+          <Text style={styles.menuText}>My Listings</Text>
+          <View style={styles.badge}>
+            <Text style={styles.badgeText}>{userStats.totalListings}</Text>
+          </View>
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.menuItem}>
+        <TouchableOpacity style={styles.menuItem} onPress={handleFavorites}>
           <View style={styles.menuIcon}>
-            <Heart size={20} color="#64748B" />
+            <Heart size={20} color={theme.textSecondary} />
           </View>
-          <Text style={styles.menuText}>{t.favorites}</Text>
+          <Text style={styles.menuText}>Favorites</Text>
+          <View style={styles.badge}>
+            <Text style={styles.badgeText}>{userStats.favoriteListings}</Text>
+          </View>
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.menuItem}>
+        <TouchableOpacity style={styles.menuItem} onPress={handleSettings}>
           <View style={styles.menuIcon}>
-            <Settings size={20} color="#64748B" />
+            <Settings size={20} color={theme.textSecondary} />
           </View>
-          <Text style={styles.menuText}>{t.settings}</Text>
+          <Text style={styles.menuText}>Settings</Text>
         </TouchableOpacity>
 
         <TouchableOpacity style={styles.menuItem} onPress={handleLogout}>
@@ -170,31 +413,29 @@ export default function ProfileScreen() {
       </View>
 
       <View style={styles.recentActivity}>
-        <Text style={styles.sectionTitle}>{t.recentActivity}</Text>
-        {currentProfile?.created_at && (
-          <View style={styles.activityItem}>
-            <View style={styles.activityIcon}>
-              <User size={16} color={theme.primary} />
+        <Text style={styles.sectionTitle}>Recent Activity</Text>
+        {recentActivity.length > 0 ? (
+          recentActivity.map((activity) => (
+            <View key={activity.id} style={styles.activityItem}>
+              <View style={[styles.activityIcon, { backgroundColor: activity.color + '20' }]}>
+                <activity.icon size={16} color={activity.color} />
+              </View>
+              <View style={styles.activityContent}>
+                <Text style={styles.activityText}>{activity.title}</Text>
+                {activity.description && (
+                  <Text style={styles.activityDescription}>{activity.description}</Text>
+                )}
+                <Text style={styles.activityTime}>
+                  {new Date(activity.timestamp).toLocaleDateString()}
+                </Text>
+              </View>
             </View>
-            <View style={styles.activityContent}>
-              <Text style={styles.activityText}>Joined Bello</Text>
-              <Text style={styles.activityTime}>
-                {new Date(currentProfile.created_at).toLocaleDateString()}
-              </Text>
-            </View>
-          </View>
-        )}
-        {currentProfile?.last_login && (
-          <View style={styles.activityItem}>
-            <View style={styles.activityIcon}>
-              <Star size={16} color="#16A34A" />
-            </View>
-            <View style={styles.activityContent}>
-              <Text style={styles.activityText}>Last active</Text>
-              <Text style={styles.activityTime}>
-                {new Date(currentProfile.last_login).toLocaleDateString()}
-              </Text>
-            </View>
+          ))
+        ) : (
+          <View style={styles.emptyActivity}>
+            <Activity size={32} color={theme.textSecondary} />
+            <Text style={styles.emptyActivityText}>No recent activity</Text>
+            <Text style={styles.emptyActivitySubtext}>Start browsing and interacting with the marketplace!</Text>
           </View>
         )}
       </View>
@@ -235,37 +476,37 @@ const createStyles = (theme: any) => StyleSheet.create({
   authTitle: {
     fontSize: 24,
     fontWeight: '700',
-    color: '#1E293B',
+    color: theme.text,
     marginBottom: 8,
   },
   authSubtitle: {
     fontSize: 16,
-    color: '#64748B',
+    color: theme.textSecondary,
     textAlign: 'center',
     marginBottom: 32,
   },
   loginButton: {
     width: '100%',
-    backgroundColor: '#2563EB',
+    backgroundColor: theme.primary,
     paddingVertical: 16,
     borderRadius: 12,
     alignItems: 'center',
     marginBottom: 12,
   },
   loginButtonText: {
-    color: '#FFFFFF',
+    color: theme.surface,
     fontSize: 16,
     fontWeight: '600',
   },
   registerButton: {
     width: '100%',
-    backgroundColor: '#F1F5F9',
+    backgroundColor: theme.border,
     paddingVertical: 16,
     borderRadius: 12,
     alignItems: 'center',
   },
   registerButtonText: {
-    color: '#2563EB',
+    color: theme.primary,
     fontSize: 16,
     fontWeight: '600',
   },
@@ -284,11 +525,21 @@ const createStyles = (theme: any) => StyleSheet.create({
     alignItems: 'center',
     flex: 1,
   },
+  profileImageContainer: {
+    marginRight: 16,
+  },
   profileImage: {
     width: 60,
     height: 60,
     borderRadius: 30,
-    marginRight: 16,
+  },
+  defaultProfileImage: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: theme.border,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   profileDetails: {
     flex: 1,
@@ -377,10 +628,10 @@ const createStyles = (theme: any) => StyleSheet.create({
   },
   statsContainer: {
     flexDirection: 'row',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: theme.surface,
     paddingVertical: 20,
     borderBottomWidth: 1,
-    borderBottomColor: '#E2E8F0',
+    borderBottomColor: theme.border,
   },
   statItem: {
     flex: 1,
@@ -389,15 +640,15 @@ const createStyles = (theme: any) => StyleSheet.create({
   statNumber: {
     fontSize: 24,
     fontWeight: '700',
-    color: '#1E293B',
+    color: theme.text,
     marginBottom: 4,
   },
   statLabel: {
     fontSize: 14,
-    color: '#64748B',
+    color: theme.textSecondary,
   },
   menuContainer: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: theme.surface,
     marginTop: 16,
     paddingVertical: 8,
   },
@@ -407,10 +658,24 @@ const createStyles = (theme: any) => StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 16,
   },
+  badge: {
+    backgroundColor: theme.primary,
+    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    marginLeft: 'auto',
+    minWidth: 24,
+    alignItems: 'center',
+  },
+  badgeText: {
+    color: theme.surface,
+    fontSize: 12,
+    fontWeight: '600',
+  },
   menuIcon: {
     width: 32,
     height: 32,
-    backgroundColor: '#F1F5F9',
+    backgroundColor: theme.background,
     borderRadius: 16,
     justifyContent: 'center',
     alignItems: 'center',
@@ -418,14 +683,14 @@ const createStyles = (theme: any) => StyleSheet.create({
   },
   menuText: {
     fontSize: 16,
-    color: '#1E293B',
+    color: theme.text,
     fontWeight: '500',
   },
   logoutText: {
     color: '#EF4444',
   },
   recentActivity: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: theme.surface,
     marginTop: 16,
     padding: 20,
     marginBottom: 20,
@@ -433,7 +698,7 @@ const createStyles = (theme: any) => StyleSheet.create({
   sectionTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#1E293B',
+    color: theme.text,
     marginBottom: 16,
   },
   activityItem: {
@@ -444,7 +709,6 @@ const createStyles = (theme: any) => StyleSheet.create({
   activityIcon: {
     width: 24,
     height: 24,
-    backgroundColor: '#F1F5F9',
     borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
@@ -455,11 +719,33 @@ const createStyles = (theme: any) => StyleSheet.create({
   },
   activityText: {
     fontSize: 14,
-    color: '#1E293B',
+    color: theme.text,
     marginBottom: 2,
   },
   activityTime: {
     fontSize: 12,
-    color: '#64748B',
+    color: theme.textSecondary,
+  },
+  activityDescription: {
+    fontSize: 13,
+    color: theme.text,
+    marginBottom: 2,
+    fontWeight: '500',
+  },
+  emptyActivity: {
+    alignItems: 'center',
+    paddingVertical: 32,
+  },
+  emptyActivityText: {
+    fontSize: 16,
+    color: theme.textSecondary,
+    marginTop: 12,
+    marginBottom: 4,
+    fontWeight: '500',
+  },
+  emptyActivitySubtext: {
+    fontSize: 14,
+    color: theme.textSecondary,
+    textAlign: 'center',
   },
 });
