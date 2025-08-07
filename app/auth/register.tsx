@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, Alert, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView } from 'react-native';
 import { Mail, Lock, Eye, EyeOff, User, Moon, Sun, ArrowLeft } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
 import { useAppContext } from '@/hooks/useAppContext';
+import { notificationService } from '@/lib/notificationService';
 
 export default function RegisterScreen() {
   const router = useRouter();
@@ -20,12 +21,20 @@ export default function RegisterScreen() {
 
   const handleRegister = async () => {
     if (!fullName || !email || !password || !confirmPassword) {
-      Alert.alert(t.errorTitle, t.errorMessage);
+      notificationService.showNotification({
+        type: 'error',
+        title: t.errorTitle,
+        message: t.errorMessage,
+      });
       return;
     }
 
     if (password !== confirmPassword) {
-      Alert.alert(t.errorTitle, t.errorPasswordMatch);
+      notificationService.showNotification({
+        type: 'error',
+        title: t.errorTitle,
+        message: t.errorPasswordMatch,
+      });
       return;
     }
 
@@ -35,14 +44,18 @@ export default function RegisterScreen() {
     });
 
     if (error) {
-      Alert.alert(t.errorTitle, error.message);
+      notificationService.showNotification({
+        type: 'error',
+        title: t.errorTitle,
+        message: error.message,
+      });
     } else {
-      Alert.alert(t.successTitle, t.verificationSent, [
-        {
-          text: 'OK',
-          onPress: () => router.replace('/(tabs)'),
-        },
-      ]);
+      notificationService.showNotification({
+        type: 'success',
+        title: t.successTitle,
+        message: t.verificationSent,
+        onConfirm: () => router.replace('/(tabs)'),
+      });
     }
   };
 

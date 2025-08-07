@@ -1,5 +1,6 @@
 import * as ImagePicker from 'expo-image-picker';
 import { Alert } from 'react-native';
+import { notificationService } from './notificationService';
 
 export interface ImagePickerResult {
   uri: string;
@@ -71,7 +72,11 @@ export class ImagePickerService {
       // Request permissions
       const hasPermission = await this.requestCameraPermissions();
       if (!hasPermission) {
-        Alert.alert('Permission Required', 'Camera permission is required to take photos.');
+        notificationService.showNotification({
+          type: 'warning',
+          title: 'Permission Required',
+          message: 'Camera permission is required to take photos.',
+        });
         return null;
       }
 
@@ -98,7 +103,11 @@ export class ImagePickerService {
       };
     } catch (error) {
       console.error('Error picking from camera:', error);
-      Alert.alert('Error', 'Failed to take photo. Please try again.');
+      notificationService.showNotification({
+        type: 'error',
+        title: 'Error',
+        message: 'Failed to take photo. Please try again.',
+      });
       return null;
     }
   }
@@ -109,7 +118,11 @@ export class ImagePickerService {
       // Request permissions
       const hasPermission = await this.requestMediaLibraryPermissions();
       if (!hasPermission) {
-        Alert.alert('Permission Required', 'Gallery permission is required to select photos.');
+        notificationService.showNotification({
+          type: 'warning',
+          title: 'Permission Required',
+          message: 'Gallery permission is required to select photos.',
+        });
         return null;
       }
 
@@ -136,7 +149,11 @@ export class ImagePickerService {
       };
     } catch (error) {
       console.error('Error picking from gallery:', error);
-      Alert.alert('Error', 'Failed to select image. Please try again.');
+      notificationService.showNotification({
+        type: 'error',
+        title: 'Error',
+        message: 'Failed to select image. Please try again.',
+      });
       return null;
     }
   }
@@ -147,7 +164,11 @@ export class ImagePickerService {
       // Request permissions
       const hasPermission = await this.requestMediaLibraryPermissions();
       if (!hasPermission) {
-        Alert.alert('Permission Required', 'Gallery permission is required to select photos.');
+        notificationService.showNotification({
+          type: 'warning',
+          title: 'Permission Required',
+          message: 'Gallery permission is required to select photos.',
+        });
         return [];
       }
 
@@ -174,7 +195,11 @@ export class ImagePickerService {
       }));
     } catch (error) {
       console.error('Error picking multiple images:', error);
-      Alert.alert('Error', 'Failed to select images. Please try again.');
+      notificationService.showNotification({
+        type: 'error',
+        title: 'Error',
+        message: 'Failed to select images. Please try again.',
+      });
       return [];
     }
   }

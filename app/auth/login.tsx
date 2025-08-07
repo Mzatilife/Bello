@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity } from 'react-native';
 import { Mail, Lock, Eye, EyeOff, Moon, Sun, ArrowLeft } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
 import { useAppContext } from '@/hooks/useAppContext';
 import SocialLoginButtons from '@/components/SocialLoginButtons';
+import { notificationService } from '@/lib/notificationService';
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -18,14 +19,22 @@ export default function LoginScreen() {
 
   const handleLogin = async () => {
     if (!email || !password) {
-      Alert.alert(t.errorTitle, t.errorMessage);
+      notificationService.showNotification({
+        type: 'error',
+        title: t.errorTitle,
+        message: t.errorMessage,
+      });
       return;
     }
 
     const { error } = await signIn(email, password);
     
     if (error) {
-      Alert.alert(t.errorTitle, error.message);
+      notificationService.showNotification({
+        type: 'error',
+        title: t.errorTitle,
+        message: error.message,
+      });
     } else {
       // Navigate to home on successful login
       router.replace('/(tabs)');

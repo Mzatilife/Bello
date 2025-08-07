@@ -1,11 +1,14 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, Image, Alert } from 'react-native';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, Image } from 'react-native';
 import { Camera, Image as ImageIcon, MapPin, DollarSign, Package, FileText, Grid, List, Moon, Sun, X } from 'lucide-react-native';
 import { useAppContext } from '@/hooks/useAppContext';
 import { useAuth } from '@/context/AuthContext';
 import AuthPrompt from '@/components/AuthPrompt';
 import { listingsService, CreateListingData } from '@/lib/services';
 import ImagePickerService from '@/lib/imagePicker';
+import { notificationService } from '@/lib/notificationService';
+import { useListingsRefresh } from '@/context/ListingsRefreshContext';
+import { useRouter } from 'expo-router';
 
 // Language content
 const translations = {
@@ -60,9 +63,12 @@ export default function SellScreen() {
   const [location, setLocation] = useState('');
   const [images, setImages] = useState<string[]>([]);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [isPublishing, setIsPublishing] = useState(false);
   
   const { theme, themeKey, toggleTheme, language, toggleLanguage, t } = useAppContext();
   const { user } = useAuth();
+  const { triggerRefresh } = useListingsRefresh();
+  const router = useRouter();
   const localTranslations = translations[language];
   const styles = createStyles(theme);
 
@@ -91,15 +97,15 @@ export default function SellScreen() {
 
   const validateForm = () => {
     if (!title.trim()) {
-      Alert.alert(localTranslations.errorTitle, 'Item title is required');
+      notificationService.error(localTranslations.errorTitle, 'Item title is required');
       return false;
     }
     if (!price.trim() || isNaN(Number(price)) || Number(price) <= 0) {
-      Alert.alert(localTranslations.errorTitle, 'Please enter a valid price');
+      notificationService.error(localTranslations.errorTitle, 'Please enter a valid price');
       return false;
     }
     if (!description.trim()) {
-      Alert.alert(localTranslations.errorTitle, 'Item description is required');
+      notificationService.error(localTranslations.errorTitle, 'Item description is required');
       return false;
     }
     return true;
@@ -108,6 +114,7 @@ export default function SellScreen() {
   const handlePublish = async () => {
     if (!validateForm()) return;
 
+    setIsPublishing(true);
     try {
       const listingData: CreateListingData = {
         title: title.trim(),
@@ -124,32 +131,39 @@ export default function SellScreen() {
 
       if (error) {
         console.error('Error creating listing:', error);
-        Alert.alert(localTranslations.errorTitle, 'Failed to create listing. Please try again.');
+        notificationService.error(localTranslations.errorTitle, 'Failed to create listing. Please try again.');
         return;
       }
 
       if (data) {
-        Alert.alert(
+        // Trigger refresh of listings on home and search pages
+        triggerRefresh();
+        
+        // Clear the form
+        setTitle('');
+        setPrice('');
+        setDescription('');
+        setCategory('');
+        setCondition('');
+        setLocation('');
+        setImages([]);
+        
+        // Show success notification with actions
+        notificationService.success(
           localTranslations.successTitle, 
           localTranslations.successMessage,
-          [{
-            text: 'OK',
-            onPress: () => {
-              // Clear the form
-              setTitle('');
-              setPrice('');
-              setDescription('');
-              setCategory('');
-              setCondition('');
-              setLocation('');
-              setImages([]);
-            }
-          }]
+          [
+            { text: 'Add Another', style: 'cancel' },
+            { text: 'View Listings', style: 'primary', onPress: () => router.push('/(tabs)') },
+          ],
+          false // Don't auto-close
         );
       }
     } catch (error) {
       console.error('Error creating listing:', error);
-      Alert.alert(localTranslations.errorTitle, 'An unexpected error occurred. Please try again.');
+      notificationService.error(localTranslations.errorTitle, 'An unexpected error occurred. Please try again.');
+    } finally {
+      setIsPublishing(false);
     }
   };
 
@@ -330,8 +344,14 @@ export default function SellScreen() {
           </ScrollView>
         </View>
 
-        <TouchableOpacity style={styles.publishButton} onPress={handlePublish}>
-          <Text style={styles.publishButtonText}>{localTranslations.publish}</Text>
+        <TouchableOpacity 
+          style={[styles.publishButton, isPublishing && styles.publishButtonDisabled]} 
+          onPress={handlePublish}
+          disabled={isPublishing}
+        >
+          <Text style={styles.publishButtonText}>
+            {isPublishing ? 'Publishing...' : localTranslations.publish}
+          </Text>
         </TouchableOpacity>
       </View>
     </ScrollView>
@@ -526,5 +546,8 @@ const createStyles = (theme: any) => StyleSheet.create({
     color: theme.surface,
     fontSize: 16,
     fontWeight: '600',
+  },
+  publishButtonDisabled: {
+    opacity: 0.6,
   },
 });

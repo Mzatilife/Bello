@@ -7,7 +7,6 @@ import {
   ScrollView,
   Image,
   TouchableOpacity,
-  Alert,
   Dimensions,
   Share
 } from 'react-native';
@@ -22,11 +21,15 @@ import {
   MessageCircle,
   Phone,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  ShoppingCart
 } from 'lucide-react-native';
+import { ActivityIndicator } from 'react-native';
 import { useAppContext } from '@/hooks/useAppContext';
 import { useAuth } from '@/context/AuthContext';
 import { Listing, listingsService, favoritesService } from '@/lib/services';
+import { cartService } from '@/lib/cartServices';
+import { notificationService } from '@/lib/notificationService';
 
 interface ListingDetailsModalProps {
   visible: boolean;
@@ -44,6 +47,7 @@ export default function ListingDetailsModal({ visible, listing, onClose }: Listi
   const [loading, setLoading] = useState(false);
   const [listingDetails, setListingDetails] = useState<any>(null);
   const [favoritesCount, setFavoritesCount] = useState(0);
+  const [addingToCart, setAddingToCart] = useState(false);
   const styles = createStyles(theme);
 
   useEffect(() => {
@@ -82,7 +86,7 @@ export default function ListingDetailsModal({ visible, listing, onClose }: Listi
 
   const handleToggleFavorite = async () => {
     if (!listing || !user) {
-      Alert.alert('Login Required', 'Please log in to add items to favorites');
+      notificationService.loginRequired('Login Required', 'Please log in to add items to favorites');
       return;
     }
 
@@ -103,9 +107,49 @@ export default function ListingDetailsModal({ visible, listing, onClose }: Listi
       }
     } catch (error) {
       console.error('Error toggling favorite:', error);
-      Alert.alert('Error', 'Failed to update favorites');
+      notificationService.error('Error', 'Failed to update favorites');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleAddToCart = async () => {
+    if (!listing || !user) {
+      notificationService.loginRequired('Login Required', 'Please log in to add items to cart');
+      return;
+    }
+
+    if (listing.status !== 'active') {
+      notificationService.warning('Unavailable', 'This item is no longer available');
+      return;
+    }
+
+    setAddingToCart(true);
+    try {
+      const { error } = await cartService.addToCart(listing.id, 1);
+      
+      if (!error) {
+        notificationService.cartSuccess(
+          () => {/* Cart modal will be handled by parent */},
+          undefined
+        );
+      } else {
+        console.error('Add to cart error:', error);
+        if (error.message?.includes('cannot add your own listing')) {
+          notificationService.warning('Not Allowed', 'You cannot add your own listing to cart');
+        } else {
+          notificationService.error('Error', 'Failed to add item to cart');
+        }
+      }
+    } catch (error: any) {
+      console.error('Error adding to cart:', error);
+      if (error.message?.includes('cannot add your own listing')) {
+        notificationService.warning('Not Allowed', 'You cannot add your own listing to cart');
+      } else {
+        notificationService.error('Error', 'Failed to add item to cart');
+      }
+    } finally {
+      setAddingToCart(false);
     }
   };
 
@@ -308,13 +352,23 @@ export default function ListingDetailsModal({ visible, listing, onClose }: Listi
         {/* Action Buttons */}
         {listing.status !== 'sold' && (
           <View style={styles.footer}>
+            <TouchableOpacity 
+              style={[styles.addToCartButton, { opacity: addingToCart ? 0.6 : 1 }]}
+              onPress={handleAddToCart}
+              disabled={addingToCart}
+            >
+              {addingToCart ? (
+                <ActivityIndicator size="small" color={theme.surface} />
+              ) : (
+                <ShoppingCart size={20} color={theme.surface} />
+              )}
+              <Text style={styles.buttonText}>
+                {addingToCart ? 'Adding...' : 'Add to Cart'}
+              </Text>
+            </TouchableOpacity>
             <TouchableOpacity style={styles.messageButton}>
               <MessageCircle size={20} color={theme.surface} />
               <Text style={styles.buttonText}>Message</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.callButton}>
-              <Phone size={20} color={theme.primary} />
-              <Text style={styles.callButtonText}>Call</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -554,6 +608,15 @@ const createStyles = (theme: any) => StyleSheet.create({
     gap: 12,
     borderTopWidth: 1,
     borderTopColor: theme.border,
+  },
+  addToCartButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: theme.success,
+    paddingVertical: 16,
+    borderRadius: 12,
   },
   messageButton: {
     flex: 1,

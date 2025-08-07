@@ -1,12 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Image } from 'react-native';
-import { Search, Bell, MapPin, Heart, Star, Grid, List, Moon, Sun } from 'lucide-react-native';
+import { Search, Bell, MapPin, Heart, Star, Grid, List, Moon, Sun, ShoppingCart } from 'lucide-react-native';
 import { useAppContext } from '@/hooks/useAppContext';
 import { useAuth } from '@/context/AuthContext';
 import { BelloIcon } from '@/components/BelloIcon';
 import ListingDetailsModal from '@/components/ListingDetailsModal';
 import { listingsService, favoritesService, Listing } from '@/lib/services';
+import { cartService } from '@/lib/cartServices';
 import { supabase } from '@/lib/supabase';
+import CartModal from '@/components/CartModal';
+import EnhancedImage from '@/components/EnhancedImage';
+import { useListingsRefresh } from '@/context/ListingsRefreshContext';
 
 const mockItems = [
   // Cosmetics
@@ -62,23 +66,28 @@ export default function HomeScreen() {
   const [loading, setLoading] = useState(true);
   const [selectedListing, setSelectedListing] = useState<Listing | null>(null);
   const [detailsModalVisible, setDetailsModalVisible] = useState(false);
+  const [cartModalVisible, setCartModalVisible] = useState(false);
+  const [cartItemsCount, setCartItemsCount] = useState(0);
   const [categories, setCategories] = useState<{ id: string; name: string }[]>([{ id: 'all', name: 'All' }]);
   
   const { theme, themeKey, toggleTheme, language, toggleLanguage, t } = useAppContext();
   const { user } = useAuth();
+  const { refreshTrigger } = useListingsRefresh();
   
   const styles = createStyles(theme);
 
   useEffect(() => {
     loadListings();
     loadCategories();
-  }, [activeCategory, searchQuery]);
+  }, [activeCategory, searchQuery, refreshTrigger]); // Add refreshTrigger dependency
 
   useEffect(() => {
     if (user) {
       loadFavorites();
+      loadCartCount();
     } else {
       setLikedItems([]);
+      setCartItemsCount(0);
     }
   }, [user]);
 
@@ -143,6 +152,17 @@ export default function HomeScreen() {
     }
   };
 
+  const loadCartCount = async () => {
+    try {
+      const { data } = await cartService.getCartSummary();
+      if (data) {
+        setCartItemsCount(data.totalItems);
+      }
+    } catch (error) {
+      console.error('Error loading cart count:', error);
+    }
+  };
+
   const toggleLike = async (itemId: string) => {
     if (!user) {
       // Handle non-authenticated user
@@ -191,6 +211,14 @@ export default function HomeScreen() {
             </TouchableOpacity>
             <TouchableOpacity onPress={toggleLanguage} style={[styles.languageButton, { backgroundColor: theme.border }]}>
               <Text style={[styles.languageText, { color: theme.text }]}>{language.toUpperCase()}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.cartButton} onPress={() => setCartModalVisible(true)}>
+              <ShoppingCart size={24} color={theme.textSecondary} />
+              {cartItemsCount > 0 && (
+                <View style={styles.cartBadge}>
+                  <Text style={styles.cartBadgeText}>{cartItemsCount > 99 ? '99+' : cartItemsCount}</Text>
+                </View>
+              )}
             </TouchableOpacity>
             <TouchableOpacity style={styles.notificationButton}>
               <Bell size={24} color={theme.textSecondary} />
@@ -269,9 +297,11 @@ export default function HomeScreen() {
             {filteredItems.map((item) => (
               <TouchableOpacity key={item.id} style={styles.gridItem} onPress={() => handleItemPress(item)}>
                 <View style={styles.imageContainer}>
-                  <Image 
-                    source={{ uri: item.images && item.images[0] ? item.images[0] : 'https://images.unsplash.com/photo-1571781926291-c477ebfd024b?w=400' }} 
-                    style={styles.itemImage} 
+                  <EnhancedImage 
+                    uri={item.images && item.images[0] ? item.images[0] : null}
+                    fallbackUri='https://images.unsplash.com/photo-1571781926291-c477ebfd024b?w=400'
+                    style={styles.itemImage}
+                    showLoadingIndicator={true}
                   />
                   <TouchableOpacity 
                     style={styles.likeButton}
@@ -308,9 +338,11 @@ export default function HomeScreen() {
           <View style={styles.itemsList}>
             {filteredItems.map((item) => (
               <TouchableOpacity key={item.id} style={styles.listItem} onPress={() => handleItemPress(item)}>
-                <Image 
-                  source={{ uri: item.images && item.images[0] ? item.images[0] : 'https://images.unsplash.com/photo-1571781926291-c477ebfd024b?w=400' }} 
-                  style={styles.listImage} 
+                <EnhancedImage 
+                  uri={item.images && item.images[0] ? item.images[0] : null}
+                  fallbackUri='https://images.unsplash.com/photo-1571781926291-c477ebfd024b?w=400'
+                  style={styles.listImage}
+                  showLoadingIndicator={true}
                 />
                 <View style={styles.listItemContent}>
                   <View style={styles.listItemHeader}>
@@ -352,6 +384,21 @@ export default function HomeScreen() {
         onClose={() => {
           setDetailsModalVisible(false);
           setSelectedListing(null);
+          // Reload cart count in case something was added
+          if (user) {
+            loadCartCount();
+          }
+        }}
+      />
+      
+      <CartModal
+        visible={cartModalVisible}
+        onClose={() => {
+          setCartModalVisible(false);
+          // Reload cart count after modal closes
+          if (user) {
+            loadCartCount();
+          }
         }}
       />
     </ScrollView>
@@ -403,6 +450,27 @@ const createStyles = (theme: any) => StyleSheet.create({
     fontWeight: '700',
     color: theme.text,
     marginLeft: 8,
+  },
+  cartButton: {
+    padding: 8,
+    position: 'relative',
+  },
+  cartBadge: {
+    position: 'absolute',
+    top: 2,
+    right: 2,
+    backgroundColor: '#EF4444',
+    borderRadius: 10,
+    minWidth: 20,
+    height: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 4,
+  },
+  cartBadgeText: {
+    color: 'white',
+    fontSize: 12,
+    fontWeight: '700',
   },
   notificationButton: {
     padding: 8,
