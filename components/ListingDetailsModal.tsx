@@ -26,8 +26,7 @@ import {
 } from 'lucide-react-native';
 import { useAppContext } from '@/hooks/useAppContext';
 import { useAuth } from '@/context/AuthContext';
-import { Listing } from '@/lib/services';
-import { favoritesService } from '@/lib/services';
+import { Listing, listingsService, favoritesService } from '@/lib/services';
 
 interface ListingDetailsModalProps {
   visible: boolean;
@@ -43,13 +42,32 @@ export default function ListingDetailsModal({ visible, listing, onClose }: Listi
   const [isFavorited, setIsFavorited] = useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [loading, setLoading] = useState(false);
+  const [listingDetails, setListingDetails] = useState<any>(null);
+  const [favoritesCount, setFavoritesCount] = useState(0);
   const styles = createStyles(theme);
 
   useEffect(() => {
-    if (listing && user) {
-      checkIfFavorited();
+    if (listing) {
+      loadListingDetails();
+      if (user) {
+        checkIfFavorited();
+      }
     }
   }, [listing, user]);
+
+  const loadListingDetails = async () => {
+    if (!listing) return;
+    
+    try {
+      const { data, error } = await listingsService.getListingWithProfile(listing.id);
+      if (!error && data) {
+        setListingDetails(data);
+        setFavoritesCount(data.favorites_count || 0);
+      }
+    } catch (error) {
+      console.error('Error loading listing details:', error);
+    }
+  };
 
   const checkIfFavorited = async () => {
     if (!listing || !user) return;
@@ -74,11 +92,13 @@ export default function ListingDetailsModal({ visible, listing, onClose }: Listi
         const { error } = await favoritesService.removeFromFavorites(listing.id);
         if (!error) {
           setIsFavorited(false);
+          setFavoritesCount(prev => Math.max(0, prev - 1));
         }
       } else {
         const { error } = await favoritesService.addToFavorites(listing.id);
         if (!error) {
           setIsFavorited(true);
+          setFavoritesCount(prev => prev + 1);
         }
       }
     } catch (error) {
@@ -242,19 +262,43 @@ export default function ListingDetailsModal({ visible, listing, onClose }: Listi
               </View>
             )}
 
-            {/* Seller Info - This would require joining with profiles table */}
+            {/* Seller Info */}
             <View style={styles.sellerSection}>
               <Text style={styles.sectionTitle}>Seller</Text>
               <View style={styles.sellerInfo}>
                 <View style={styles.sellerAvatar}>
-                  <User size={24} color={theme.textSecondary} />
+                  {listingDetails?.profiles?.photo_url ? (
+                    <Image 
+                      source={{ uri: listingDetails.profiles.photo_url }} 
+                      style={styles.sellerAvatarImage}
+                    />
+                  ) : (
+                    <User size={24} color={theme.textSecondary} />
+                  )}
                 </View>
                 <View style={styles.sellerDetails}>
-                  <Text style={styles.sellerName}>Seller</Text>
+                  <Text style={styles.sellerName}>
+                    {listingDetails?.profiles?.display_name || 'Anonymous Seller'}
+                  </Text>
                   <View style={styles.sellerRating}>
                     <Star size={14} color="#F59E0B" fill="#F59E0B" />
-                    <Text style={styles.ratingText}>4.8 (12 reviews)</Text>
+                    <Text style={styles.ratingText}>
+                      {favoritesCount > 0 
+                        ? `${Math.min(5.0, 3.5 + (favoritesCount * 0.1)).toFixed(1)} (${favoritesCount} ${favoritesCount === 1 ? 'favorite' : 'favorites'})`
+                        : 'New seller'
+                      }
+                    </Text>
                   </View>
+                  {listingDetails?.seller_listings_count && (
+                    <Text style={styles.sellerStats}>
+                      {listingDetails.seller_listings_count} active listings
+                    </Text>
+                  )}
+                  {listingDetails?.profiles?.created_at && (
+                    <Text style={styles.sellerJoined}>
+                      Joined {new Date(listingDetails.profiles.created_at).toLocaleDateString()}
+                    </Text>
+                  )}
                 </View>
               </View>
             </View>
@@ -468,6 +512,11 @@ const createStyles = (theme: any) => StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
+    overflow: 'hidden',
+  },
+  sellerAvatarImage: {
+    width: '100%',
+    height: '100%',
   },
   sellerDetails: {
     flex: 1,
@@ -486,6 +535,16 @@ const createStyles = (theme: any) => StyleSheet.create({
     fontSize: 14,
     color: theme.textSecondary,
     marginLeft: 4,
+  },
+  sellerStats: {
+    fontSize: 12,
+    color: theme.textSecondary,
+    marginTop: 2,
+  },
+  sellerJoined: {
+    fontSize: 12,
+    color: theme.textSecondary,
+    marginTop: 2,
   },
   footer: {
     flexDirection: 'row',

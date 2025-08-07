@@ -99,7 +99,7 @@ export const listingsService = {
       .order('created_at', { ascending: false });
 
     if (filters?.category && filters.category !== 'all') {
-      query = query.eq('category', filters.category);
+      query = query.ilike('category', `%${filters.category}%`);
     }
 
     if (filters?.search) {
@@ -115,6 +115,49 @@ export const listingsService = {
     }
 
     const { data, error } = await query;
+    return { data, error };
+  },
+
+  // Get listing with seller profile and favorites count
+  getListingWithProfile: async (listingId: string) => {
+    const { data, error } = await supabase
+      .from('listings')
+      .select(`
+        *,
+        profiles!user_id (
+          uid,
+          display_name,
+          photo_url,
+          created_at
+        )
+      `)
+      .eq('id', listingId)
+      .single();
+
+    if (!error && data) {
+      // Get favorites count for this listing
+      const { data: favCount } = await supabase
+        .from('favorites')
+        .select('id', { count: 'exact' })
+        .eq('listing_id', listingId);
+      
+      // Get seller's total listings count
+      const { data: sellerListings } = await supabase
+        .from('listings')
+        .select('id', { count: 'exact' })
+        .eq('user_id', data.user_id)
+        .eq('status', 'active');
+
+      return {
+        data: {
+          ...data,
+          favorites_count: favCount?.length || 0,
+          seller_listings_count: sellerListings?.length || 0
+        },
+        error: null
+      };
+    }
+
     return { data, error };
   },
 
@@ -240,6 +283,16 @@ export const favoritesService = {
       .single();
 
     return { data: !!data, error: error?.code === 'PGRST116' ? null : error };
+  },
+
+  // Get favorites count for a listing
+  getFavoritesCount: async (listingId: string) => {
+    const { data, error } = await supabase
+      .from('favorites')
+      .select('id', { count: 'exact' })
+      .eq('listing_id', listingId);
+
+    return { data: data?.length || 0, error };
   },
 };
 

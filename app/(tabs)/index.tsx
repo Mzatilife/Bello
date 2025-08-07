@@ -85,8 +85,12 @@ export default function HomeScreen() {
   const loadListings = async () => {
     try {
       setLoading(true);
+      // Find the actual category name from the categories array
+      const selectedCategory = categories.find(cat => cat.id === activeCategory);
+      const categoryName = selectedCategory && selectedCategory.id !== 'all' ? selectedCategory.name : undefined;
+      
       const { data, error } = await listingsService.getListings({
-        category: activeCategory !== 'all' ? activeCategory : undefined,
+        category: categoryName,
         search: searchQuery || undefined,
         limit: 20
       });
