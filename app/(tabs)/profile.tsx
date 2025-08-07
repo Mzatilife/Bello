@@ -11,6 +11,9 @@ import { listingsService, favoritesService, Listing } from '@/lib/services';
 import { notificationService } from '@/lib/notificationService';
 import { supabase } from '@/lib/supabase';
 import EnhancedImage from '@/components/EnhancedImage';
+import MyListingsModal from '@/components/MyListingsModal';
+import FavoritesModal from '@/components/FavoritesModal';
+import ListingDetailsModal from '@/components/ListingDetailsModal';
 
 interface UserStats {
   totalListings: number;
@@ -45,6 +48,10 @@ export default function ProfileScreen() {
   });
   const [recentActivity, setRecentActivity] = useState<ActivityItem[]>([]);
   const [statsLoading, setStatsLoading] = useState(true);
+  const [myListingsVisible, setMyListingsVisible] = useState(false);
+  const [favoritesVisible, setFavoritesVisible] = useState(false);
+  const [selectedListing, setSelectedListing] = useState<Listing | null>(null);
+  const [listingDetailsVisible, setListingDetailsVisible] = useState(false);
   const styles = createStyles(theme);
 
   useEffect(() => {
@@ -199,50 +206,34 @@ export default function ProfileScreen() {
   };
   
   const handleMyListings = () => {
-    if (userStats.totalListings === 0) {
-      notificationService.info(
-        'No Listings Yet',
-        'You haven\'t created any listings yet. Start selling by adding your first item!',
-        [
-          { text: 'Close', style: 'cancel' },
-          { text: 'Start Selling', style: 'primary', onPress: () => router.push('/(tabs)/sell') },
-        ]
-      );
-      return;
-    }
-    
-    // For now, show a modal with user's listings info
-    notificationService.info(
-      'My Listings',
-      `You have ${userStats.totalListings} total listings:\n• ${userStats.activeListings} active\n• ${userStats.soldListings} sold`,
-      [
-        { text: 'Close', style: 'cancel' },
-        { text: 'Add New Listing', style: 'primary', onPress: () => router.push('/(tabs)/sell') },
-      ]
-    );
+    setMyListingsVisible(true);
   };
   
   const handleFavorites = () => {
-    if (userStats.favoriteListings === 0) {
-      notificationService.info(
-        'No Favorites Yet',
-        'You haven\'t added any items to your favorites yet. Browse the marketplace and save items you like!',
-        [
-          { text: 'Close', style: 'cancel' },
-          { text: 'Browse Items', style: 'primary', onPress: () => router.push('/(tabs)') },
-        ]
-      );
-      return;
+    setFavoritesVisible(true);
+  };
+
+  const handleFavoriteItemPress = (listing: Listing) => {
+    setSelectedListing(listing);
+    setListingDetailsVisible(true);
+    setFavoritesVisible(false);
+  };
+
+  const handleListingDetailsClose = () => {
+    setListingDetailsVisible(false);
+    setSelectedListing(null);
+    // Reload stats in case something changed
+    if (user) {
+      loadUserStats();
     }
-    
-    notificationService.info(
-      'My Favorites',
-      `You have ${userStats.favoriteListings} items in your favorites. Visit the home screen and look for the heart icons on items you've favorited.`,
-      [
-        { text: 'Close', style: 'cancel' },
-        { text: 'View Items', style: 'primary', onPress: () => router.push('/(tabs)') },
-      ]
-    );
+  };
+
+  const handleListingUpdate = () => {
+    // Reload stats when a listing is updated/deleted
+    if (user) {
+      loadUserStats();
+      loadRecentActivity();
+    }
   };
   
   const handleSettings = () => {
@@ -444,6 +435,24 @@ export default function ProfileScreen() {
         visible={editModalVisible}
         onClose={() => setEditModalVisible(false)}
         onUpdate={handleProfileUpdate}
+      />
+
+      <MyListingsModal
+        visible={myListingsVisible}
+        onClose={() => setMyListingsVisible(false)}
+        onListingUpdate={handleListingUpdate}
+      />
+
+      <FavoritesModal
+        visible={favoritesVisible}
+        onClose={() => setFavoritesVisible(false)}
+        onItemPress={handleFavoriteItemPress}
+      />
+
+      <ListingDetailsModal
+        visible={listingDetailsVisible}
+        listing={selectedListing}
+        onClose={handleListingDetailsClose}
       />
     </ScrollView>
   );

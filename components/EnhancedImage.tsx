@@ -4,7 +4,7 @@ import { useAppContext } from '@/hooks/useAppContext';
 
 interface EnhancedImageProps extends Omit<ImageProps, 'source'> {
   uri?: string | null;
-  fallbackUri?: string;
+  fallbackUri?: string | null;
   showLoadingIndicator?: boolean;
 }
 
@@ -19,6 +19,12 @@ export default function EnhancedImage({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [currentUri, setCurrentUri] = useState(uri);
+  
+  // Update currentUri when uri prop changes
+  React.useEffect(() => {
+    setCurrentUri(uri);
+    setError(false);
+  }, [uri]);
 
   const handleLoadStart = () => {
     setLoading(true);
@@ -44,6 +50,9 @@ export default function EnhancedImage({
   const getImageSource = () => {
     let imageUri = currentUri || fallbackUri;
     
+    // Debug logging
+    console.log('EnhancedImage - URI:', uri, 'Current URI:', currentUri, 'Fallback:', fallbackUri);
+    
     // Add cache busting and ensure HTTPS for better cross-device compatibility
     if (imageUri) {
       // Convert HTTP to HTTPS for better security and compatibility
@@ -55,11 +64,14 @@ export default function EnhancedImage({
         imageUri += `${separator}cache=${Date.now()}`;
       }
       
+      console.log('EnhancedImage - Final URI:', imageUri);
       return { uri: imageUri };
     }
     
     // If no URI, return a default Unsplash placeholder
-    return { uri: 'https://images.unsplash.com/photo-1571781926291-c477ebfd024b?w=400&h=400&fit=crop&crop=center' };
+    const defaultUri = 'https://images.unsplash.com/photo-1571781926291-c477ebfd024b?w=400&h=400&fit=crop&crop=center';
+    console.log('EnhancedImage - Using default URI:', defaultUri);
+    return { uri: defaultUri };
   };
 
   const imageSource = getImageSource();
@@ -73,11 +85,6 @@ export default function EnhancedImage({
         onLoadStart={handleLoadStart}
         onLoadEnd={handleLoadEnd}
         onError={handleError}
-        // Add headers for better compatibility
-        headers={{
-          'Cache-Control': 'no-cache',
-          'User-Agent': 'BelloApp/1.0',
-        }}
       />
       
       {loading && showLoadingIndicator && (
