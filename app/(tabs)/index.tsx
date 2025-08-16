@@ -10,7 +10,10 @@ import { cartService } from '@/lib/cartServices';
 import { supabase } from '@/lib/supabase';
 import CartModal from '@/components/CartModal';
 import EnhancedImage from '@/components/EnhancedImage';
+import TopSellerCarousel from '@/components/TopSellerCarousel';
+import AdvertisementBanner from '@/components/AdvertisementBanner';
 import { useListingsRefresh } from '@/context/ListingsRefreshContext';
+import { useRouter } from 'expo-router';
 
 const mockItems = [
   // Cosmetics
@@ -73,6 +76,7 @@ export default function HomeScreen() {
   const { theme, themeKey, toggleTheme, language, toggleLanguage, t } = useAppContext();
   const { user } = useAuth();
   const { refreshTrigger } = useListingsRefresh();
+  const router = useRouter();
   
   const styles = createStyles(theme);
 
@@ -212,11 +216,25 @@ export default function HomeScreen() {
             <TouchableOpacity onPress={toggleLanguage} style={[styles.languageButton, { backgroundColor: theme.border }]}>
               <Text style={[styles.languageText, { color: theme.text }]}>{language.toUpperCase()}</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.cartButton} onPress={() => setCartModalVisible(true)}>
+            <TouchableOpacity 
+              style={styles.cartButton} 
+              onPress={() => {
+                if (user) {
+                  setCartModalVisible(true);
+                } else {
+                  router.push('/auth/login');
+                }
+              }}
+            >
               <ShoppingCart size={24} color={theme.textSecondary} />
-              {cartItemsCount > 0 && (
+              {user && cartItemsCount > 0 && (
                 <View style={styles.cartBadge}>
                   <Text style={styles.cartBadgeText}>{cartItemsCount > 99 ? '99+' : cartItemsCount}</Text>
+                </View>
+              )}
+              {!user && (
+                <View style={styles.authIndicator}>
+                  <Text style={styles.authIndicatorText}>!</Text>
                 </View>
               )}
             </TouchableOpacity>
@@ -240,6 +258,19 @@ export default function HomeScreen() {
           />
         </View>
       </View>
+
+      <AdvertisementBanner
+        onAdClick={(ad) => console.log('Ad clicked:', ad.title)}
+        maxAds={3}
+        autoScroll={true}
+        showCloseButton={true}
+      />
+
+      <TopSellerCarousel
+        onItemPress={handleItemPress}
+        onLikeToggle={toggleLike}
+        likedItems={likedItems}
+      />
 
       <View style={styles.categoriesContainer}>
         <View style={styles.sectionHeader}>
@@ -470,6 +501,22 @@ const createStyles = (theme: any) => StyleSheet.create({
   cartBadgeText: {
     color: 'white',
     fontSize: 12,
+    fontWeight: '700',
+  },
+  authIndicator: {
+    position: 'absolute',
+    top: 2,
+    right: 2,
+    backgroundColor: '#F59E0B',
+    borderRadius: 8,
+    width: 16,
+    height: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  authIndicatorText: {
+    color: 'white',
+    fontSize: 10,
     fontWeight: '700',
   },
   notificationButton: {

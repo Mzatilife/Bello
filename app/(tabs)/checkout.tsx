@@ -23,6 +23,7 @@ import { useAppContext } from '@/hooks/useAppContext';
 import { useAuth } from '@/context/AuthContext';
 import { cartService, orderService, CartItem, CheckoutData } from '@/lib/cartServices';
 import { notificationService } from '@/lib/notificationService';
+import ProtectedRoute from '@/components/ProtectedRoute';
 
 export default function CheckoutScreen() {
   const router = useRouter();
@@ -48,12 +49,19 @@ export default function CheckoutScreen() {
   const styles = createStyles(theme);
 
   useEffect(() => {
+    if (!user) {
+      router.replace('/(tabs)');
+      return;
+    }
+    loadCartItems();
+  }, [user]);
+
+  useEffect(() => {
     loadCartItems();
   }, []);
 
   const loadCartItems = async () => {
     if (!user) {
-      router.replace('/(tabs)');
       return;
     }
 
@@ -157,17 +165,18 @@ export default function CheckoutScreen() {
   const total = subtotal + deliveryFee;
   const totalItems = cartItems.reduce((sum, item) => sum + item.quantity, 0);
 
-  if (loading) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={theme.primary} />
-        <Text style={styles.loadingText}>Loading checkout...</Text>
-      </View>
-    );
-  }
+  const CheckoutContent = () => {
+    if (loading) {
+      return (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={theme.primary} />
+          <Text style={styles.loadingText}>Loading checkout...</Text>
+        </View>
+      );
+    }
 
-  return (
-    <View style={styles.container}>
+    return (
+      <View style={styles.container}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
           <ArrowLeft size={24} color={theme.text} />
@@ -338,7 +347,18 @@ export default function CheckoutScreen() {
           </Text>
         </TouchableOpacity>
       </View>
-    </View>
+      </View>
+    );
+  };
+
+  return (
+    <ProtectedRoute
+      title="Checkout Login Required"
+      description="You need to be logged in to proceed with checkout."
+      icon="cart"
+    >
+      <CheckoutContent />
+    </ProtectedRoute>
   );
 }
 

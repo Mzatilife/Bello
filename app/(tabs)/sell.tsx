@@ -4,6 +4,7 @@ import { Camera, Image as ImageIcon, MapPin, DollarSign, Package, FileText, Grid
 import { useAppContext } from '@/hooks/useAppContext';
 import { useAuth } from '@/context/AuthContext';
 import AuthPrompt from '@/components/AuthPrompt';
+import ProtectedRoute from '@/components/ProtectedRoute';
 import { listingsService, CreateListingData } from '@/lib/services';
 import ImagePickerService from '@/lib/imagePicker';
 import { notificationService } from '@/lib/notificationService';
@@ -72,16 +73,6 @@ export default function SellScreen() {
   const localTranslations = translations[language];
   const styles = createStyles(theme);
 
-  // Show auth prompt if user is not logged in
-  if (!user) {
-    return (
-      <AuthPrompt
-        title={language === 'en' ? "Start Selling Today" : "Yambani Kugulitsa Lero"}
-        description={language === 'en' ? "Create an account to list your items and start selling in the marketplace." : "Pangani akaunti kuti muzilembetsa zinthu zanu ndi kuyamba kugulitsa m'msika."}
-        icon="user"
-      />
-    );
-  }
 
   const handleImagePick = async () => {
     const newImages = await ImagePickerService.pickMultipleFromGallery(5 - images.length);
@@ -167,7 +158,7 @@ export default function SellScreen() {
     }
   };
 
-  return (
+  const SellContent = () => (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false} contentContainerStyle={{paddingBottom: 140}}>
       <View style={styles.header}>
         <View style={styles.headerTop}>
@@ -355,6 +346,16 @@ export default function SellScreen() {
         </TouchableOpacity>
       </View>
     </ScrollView>
+  );
+
+  return (
+    <ProtectedRoute
+      title={language === 'en' ? "Start Selling Today" : "Yambani Kugulitsa Lero"}
+      description={language === 'en' ? "Create an account to list your items and start selling in the marketplace." : "Pangani akaunti kuti muzilembetsa zinthu zanu ndi kuyamba kugulitsa m'msika."}
+      icon="sell"
+    >
+      <SellContent />
+    </ProtectedRoute>
   );
 }
 

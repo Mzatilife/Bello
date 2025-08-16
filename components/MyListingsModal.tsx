@@ -7,7 +7,6 @@ import {
   ScrollView,
   TouchableOpacity,
   Image,
-  Alert,
   ActivityIndicator,
   RefreshControl,
 } from 'react-native';
@@ -28,6 +27,7 @@ import { Listing, listingsService } from '@/lib/services';
 import EnhancedImage from '@/components/EnhancedImage';
 import { notificationService } from '@/lib/notificationService';
 import EditListingModal from '@/components/EditListingModal';
+import NotificationModal from '@/components/NotificationModal';
 
 interface MyListingsModalProps {
   visible: boolean;
@@ -44,6 +44,8 @@ export default function MyListingsModal({ visible, onClose, onListingUpdate }: M
   const [activeFilter, setActiveFilter] = useState<'all' | 'active' | 'sold'>('all');
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [selectedListingForEdit, setSelectedListingForEdit] = useState<Listing | null>(null);
+  const [deleteModalVisible, setDeleteModalVisible] = useState(false);
+  const [listingToDelete, setListingToDelete] = useState<Listing | null>(null);
   const styles = createStyles(theme);
 
   useEffect(() => {
@@ -97,18 +99,8 @@ export default function MyListingsModal({ visible, onClose, onListingUpdate }: M
   };
 
   const handleDeleteListing = (listing: Listing) => {
-    Alert.alert(
-      'Delete Listing',
-      `Are you sure you want to delete "${listing.title}"? This action cannot be undone.`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: () => confirmDeleteListing(listing.id)
-        }
-      ]
-    );
+    setListingToDelete(listing);
+    setDeleteModalVisible(true);
   };
 
   const confirmDeleteListing = async (listingId: string) => {
@@ -344,6 +336,38 @@ export default function MyListingsModal({ visible, onClose, onListingUpdate }: M
           setSelectedListingForEdit(null);
         }}
         onUpdate={handleListingUpdated}
+      />
+      
+      <NotificationModal
+        visible={deleteModalVisible}
+        onClose={() => {
+          setDeleteModalVisible(false);
+          setListingToDelete(null);
+        }}
+        type="warning"
+        title="Delete Listing"
+        message={`Are you sure you want to delete "${listingToDelete?.title}"? This action cannot be undone.`}
+        buttons={[
+          {
+            text: "Cancel",
+            style: "cancel",
+            onPress: () => {
+              setDeleteModalVisible(false);
+              setListingToDelete(null);
+            }
+          },
+          {
+            text: "Delete",
+            style: "destructive",
+            onPress: () => {
+              if (listingToDelete) {
+                confirmDeleteListing(listingToDelete.id);
+              }
+              setDeleteModalVisible(false);
+              setListingToDelete(null);
+            }
+          }
+        ]}
       />
     </Modal>
   );

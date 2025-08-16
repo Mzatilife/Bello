@@ -2,17 +2,40 @@ import { Tabs } from 'expo-router';
 import { Home, Plus, User, Search, ShoppingBag, Lock } from 'lucide-react-native';
 import { useAppContext } from '@/hooks/useAppContext';
 import { useAuth } from '@/context/AuthContext';
-import { View } from 'react-native';
+import { View, TouchableOpacity } from 'react-native';
+import { useRouter } from 'expo-router';
+import AuthModal from '@/components/AuthModal';
+import React, { useState } from 'react';
 
 export default function TabLayout() {
   const { theme } = useAppContext();
   const { user } = useAuth();
+  const router = useRouter();
+  const [authModalVisible, setAuthModalVisible] = useState(false);
+  const [authModalConfig, setAuthModalConfig] = useState({
+    title: '',
+    description: '',
+    icon: 'lock' as 'lock' | 'user' | 'login' | 'sell' | 'cart'
+  });
   
+  const handleProtectedTabPress = (tabName: string, isProtected: boolean) => {
+    if (isProtected && !user) {
+      setAuthModalConfig({
+        title: `${tabName} Requires Login`,
+        description: `You need to be logged in to access ${tabName}. Please sign in or create an account to continue.`,
+        icon: tabName.toLowerCase() as any,
+      });
+      setAuthModalVisible(true);
+      return false;
+    }
+    return true;
+  };
+
   const renderProtectedIcon = (IconComponent: any, size: number, color: string, isProtected: boolean) => {
     if (isProtected && !user) {
       return (
         <View style={{ position: 'relative' }}>
-          <IconComponent size={size} color={color} strokeWidth={2.5} />
+          <IconComponent size={size} color='#94A3B8' strokeWidth={2.5} />
           <View style={{ 
             position: 'absolute', 
             top: -2, 
@@ -33,6 +56,7 @@ export default function TabLayout() {
   };
   
   return (
+    <>
     <Tabs
       screenOptions={{
         headerShown: false,
@@ -92,12 +116,26 @@ export default function TabLayout() {
           title: 'Sell',
           tabBarIcon: ({ size, color }) => renderProtectedIcon(Plus, 26, color, true),
         }}
+        listeners={{
+          tabPress: (e) => {
+            if (!handleProtectedTabPress('Sell', true)) {
+              e.preventDefault();
+            }
+          }
+        }}
       />
       <Tabs.Screen
         name="checkout"
         options={{
           title: 'Cart',
           tabBarIcon: ({ size, color }) => renderProtectedIcon(ShoppingBag, 26, color, true),
+        }}
+        listeners={{
+          tabPress: (e) => {
+            if (!handleProtectedTabPress('Cart', true)) {
+              e.preventDefault();
+            }
+          }
         }}
       />
       <Tabs.Screen
@@ -110,5 +148,13 @@ export default function TabLayout() {
         }}
       />
     </Tabs>
+    <AuthModal 
+      visible={authModalVisible}
+      onClose={() => setAuthModalVisible(false)}
+      title={authModalConfig.title}
+      description={authModalConfig.description}
+      icon={authModalConfig.icon}
+    />
+    </>
   );
 }

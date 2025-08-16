@@ -173,7 +173,7 @@ export default function NotificationModal({
                   key={index}
                   style={[
                     getButtonStyle(button.style),
-                    buttons.length > 1 && index > 0 && styles.buttonSpacing
+                    buttons.length > 1 && buttons.length <= 2 && index > 0 && styles.buttonSpacing
                   ]}
                   onPress={() => handleButtonPress(button)}
                   activeOpacity={0.7}
@@ -262,6 +262,7 @@ const createStyles = (theme: any) => StyleSheet.create({
   },
   buttonContainerColumn: {
     flexDirection: 'column',
+    gap: 12,
   },
   button: {
     paddingVertical: 12,
@@ -273,6 +274,7 @@ const createStyles = (theme: any) => StyleSheet.create({
   },
   buttonSpacing: {
     marginLeft: 12,
+    marginTop: 0,
   },
   buttonContent: {
     flexDirection: 'row',

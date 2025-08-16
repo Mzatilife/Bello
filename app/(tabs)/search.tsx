@@ -37,8 +37,10 @@ export default function SearchScreen() {
     loadCategories();
     if (user) {
       loadFavorites();
+    } else {
+      setLikedItems([]);
     }
-  }, [selectedCategory, searchQuery]);
+  }, [selectedCategory, searchQuery, user]);
 
   const loadListings = async () => {
     try {

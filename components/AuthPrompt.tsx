@@ -1,13 +1,13 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { Lock, User, LogIn } from 'lucide-react-native';
+import { Lock, User, LogIn, Plus, ShoppingBag } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { useAppContext } from '@/hooks/useAppContext';
 
 interface AuthPromptProps {
   title: string;
   description: string;
-  icon?: 'lock' | 'user' | 'login';
+  icon?: 'lock' | 'user' | 'login' | 'sell' | 'cart';
 }
 
 export default function AuthPrompt({ title, description, icon = 'lock' }: AuthPromptProps) {
@@ -21,6 +21,10 @@ export default function AuthPrompt({ title, description, icon = 'lock' }: AuthPr
         return <User size={48} color={theme.textSecondary} />;
       case 'login':
         return <LogIn size={48} color={theme.textSecondary} />;
+      case 'sell':
+        return <Plus size={48} color={theme.textSecondary} />;
+      case 'cart':
+        return <ShoppingBag size={48} color={theme.textSecondary} />;
       default:
         return <Lock size={48} color={theme.textSecondary} />;
     }
